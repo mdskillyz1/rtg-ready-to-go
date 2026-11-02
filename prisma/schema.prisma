@@ -1,0 +1,503 @@
+// PostgreSQL production design; runnable sandbox persistence is in lib/store.ts.
+// Prisma 6 schema. No production migrations or Prisma repository are applied yet.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum Provider {
+  MANUAL
+  UBER_EATS
+  DELIVEROO
+}
+
+enum IntegrationMode {
+  SANDBOX
+  LIVE
+}
+
+enum ConnectionStatus {
+  DISCONNECTED
+  FIXTURES_ONLY
+  APPROVAL_PENDING
+  APPROVED
+  REVOKED
+}
+
+enum OrderStatus {
+  NEW
+  PACKING
+  READY
+  COLLECTED
+  CANCELLED
+}
+
+enum EvidenceStage {
+  PACKED
+  SEALED
+  HANDOFF
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+enum DisputeStatus {
+  DRAFT
+  OPEN
+  SUBMITTED
+  RESOLVED
+  CLOSED
+}
+
+enum ConsentAction {
+  GRANTED
+  WITHDRAWN
+}
+
+model Organisation {
+  id               String            @id @default(uuid()) @db.Uuid
+  name             String
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  locations        Location[]
+  roles            Role[]
+  memberships      Membership[]
+  connections      ProviderConnection[]
+  auditLogs        AuditLog[]
+  subscriptions    Subscription[]
+  usageRecords     UsageRecord[]
+  consentRecords   ConsentRecord[]
+  retentionPolicies RetentionPolicy[]
+}
+
+// User is global identity. Organisation access exists only through Membership.
+model User {
+  id          String       @id @default(uuid()) @db.Uuid
+  authSubject String       @unique
+  displayName String
+  email       String?
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  memberships Membership[]
+}
+
+model Role {
+  id             String       @id @default(uuid()) @db.Uuid
+  organisationId String       @db.Uuid
+  code           RoleCode
+  // Versioned allowlisted action names; no client-issued permissions.
+  permissions    Json
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  memberships    Membership[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, code])
+}
+
+model Membership {
+  id              String                   @id @default(uuid()) @db.Uuid
+  organisationId  String                   @db.Uuid
+  userId          String                   @db.Uuid
+  roleId          String                   @db.Uuid
+  active          Boolean                  @default(true)
+  allLocations    Boolean                  @default(false)
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  organisation    Organisation             @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role            Role                     @relation(fields: [organisationId, roleId], references: [organisationId, id], onDelete: Restrict)
+  locations       MembershipLocation[]
+  createdOrders   Order[]
+  captures        EvidenceCaptureSession[]
+  evidence        EvidenceAsset[]
+  handovers       HandoverEvent[]
+  exports         EvidenceExport[]
+  auditLogs       AuditLog[]
+  consentRecords  ConsentRecord[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, userId])
+}
+
+model Location {
+  id               String                 @id @default(uuid()) @db.Uuid
+  organisationId   String                 @db.Uuid
+  name             String
+  restaurantName   String
+  timezone         String                 @default("Europe/London")
+  active           Boolean                @default(true)
+  organisation     Organisation           @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  memberships      MembershipLocation[]
+  mappings         ProviderStoreMapping[]
+  orders           Order[]
+  retentionPolicies RetentionPolicy[]
+
+  @@unique([organisationId, id])
+}
+
+model MembershipLocation {
+  id             String     @id @default(uuid()) @db.Uuid
+  organisationId String     @db.Uuid
+  membershipId   String     @db.Uuid
+  locationId     String     @db.Uuid
+  membership     Membership @relation(fields: [organisationId, membershipId], references: [organisationId, id], onDelete: Cascade)
+  location       Location   @relation(fields: [organisationId, locationId], references: [organisationId, id], onDelete: Restrict)
+
+  @@unique([organisationId, membershipId, locationId])
+}
+
+model ProviderConnection {
+  id                    String             @id @default(uuid()) @db.Uuid
+  organisationId        String             @db.Uuid
+  provider              Provider
+  mode                  IntegrationMode    @default(SANDBOX)
+  status                ConnectionStatus   @default(FIXTURES_ONLY)
+  // Only references to secret manager entries; never plaintext tokens.
+  credentialReference   String?
+  approvalReference     String?
+  approvedScopes        Json?
+  authorizedAt          DateTime?          @db.Timestamptz(3)
+  authorizationExpires  DateTime?          @db.Timestamptz(3)
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
+  organisation          Organisation       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  mappings              ProviderStoreMapping[]
+  webhookInbox          WebhookInbox[]
+  syncJobs              SyncJob[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, id, provider])
+  @@index([organisationId, provider, mode])
+}
+
+model ProviderStoreMapping {
+  id              String             @id @default(uuid()) @db.Uuid
+  organisationId  String             @db.Uuid
+  connectionId    String             @db.Uuid
+  locationId      String             @db.Uuid
+  provider        Provider
+  providerStoreId String
+  active          Boolean            @default(false)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  connection      ProviderConnection @relation(fields: [organisationId, connectionId, provider], references: [organisationId, id, provider], onDelete: Restrict)
+  location        Location           @relation(fields: [organisationId, locationId], references: [organisationId, id], onDelete: Restrict)
+  orders          Order[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, locationId, id, provider])
+  @@unique([organisationId, connectionId, providerStoreId])
+  @@unique([organisationId, locationId, provider])
+}
+
+model Order {
+  id                     String                @id @default(uuid()) @db.Uuid
+  organisationId         String                @db.Uuid
+  locationId             String                @db.Uuid
+  providerStoreMappingId String?               @db.Uuid
+  createdByMembershipId  String?               @db.Uuid
+  provider               Provider              @default(MANUAL)
+  // Full provider ID must never be replaced by a displayed short reference.
+  providerOrderId        String?
+  shortReference         String
+  status                 OrderStatus           @default(NEW)
+  currency               String                @default("GBP") @db.Char(3)
+  totalMinor             Int                   @default(0)
+  notes                  String?
+  sandbox                Boolean               @default(true)
+  providerCreatedAt      DateTime?             @db.Timestamptz(3)
+  receivedAt             DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @db.Timestamptz(3)
+  version                Int                   @default(1)
+  location               Location              @relation(fields: [organisationId, locationId], references: [organisationId, id], onDelete: Restrict)
+  storeMapping           ProviderStoreMapping? @relation(fields: [organisationId, locationId, providerStoreMappingId, provider], references: [organisationId, locationId, id, provider], onDelete: Restrict)
+  createdBy              Membership?           @relation(fields: [organisationId, createdByMembershipId], references: [organisationId, id], onDelete: Restrict)
+  items                  OrderItem[]
+  events                 OrderEvent[]
+  captureSessions        EvidenceCaptureSession[]
+  evidence               EvidenceAsset[]
+  handovers              HandoverEvent[]
+  disputes               DisputeCase[]
+  exports                EvidenceExport[]
+  auditLogs              AuditLog[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, locationId, provider, providerOrderId])
+  @@index([organisationId, locationId, status, receivedAt])
+  @@index([organisationId, shortReference])
+}
+
+model OrderItem {
+  id             String @id @default(uuid()) @db.Uuid
+  organisationId String @db.Uuid
+  orderId        String @db.Uuid
+  providerItemId String?
+  name           String
+  quantity       Int
+  unitPriceMinor Int    @default(0)
+  notes          String?
+  order          Order  @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, orderId])
+}
+
+model OrderEvent {
+  id               String      @id @default(uuid()) @db.Uuid
+  organisationId   String      @db.Uuid
+  orderId          String      @db.Uuid
+  providerEventId  String?
+  eventType        String
+  status           OrderStatus?
+  providerOccurredAt DateTime? @db.Timestamptz(3)
+  receivedAt       DateTime    @default(now()) @db.Timestamptz(3)
+  payloadSha256    String?     @db.Char(64)
+  metadata         Json
+  order            Order       @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+
+  @@unique([organisationId, orderId, providerEventId])
+  @@index([organisationId, orderId, receivedAt])
+}
+
+model EvidenceCaptureSession {
+  id                     String          @id @default(uuid()) @db.Uuid
+  organisationId         String          @db.Uuid
+  orderId                String          @db.Uuid
+  capturedByMembershipId String          @db.Uuid
+  startedAt              DateTime        @default(now()) @db.Timestamptz(3)
+  closedAt               DateTime?       @db.Timestamptz(3)
+  order                  Order           @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+  capturedBy             Membership      @relation(fields: [organisationId, capturedByMembershipId], references: [organisationId, id], onDelete: Restrict)
+  assets                 EvidenceAsset[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, orderId, id])
+}
+
+// Capture metadata is immutable after insertion. Deletion is an audited lifecycle action.
+model EvidenceAsset {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  organisationId         String                  @db.Uuid
+  orderId                String                  @db.Uuid
+  captureSessionId       String?                 @db.Uuid
+  clientCaptureId        String?                 @db.Uuid
+  capturedByMembershipId String                  @db.Uuid
+  stage                  EvidenceStage
+  sealId                 String?
+  note                   String?
+  storageKey             String                  @unique
+  storageVersionId       String?
+  originalFilename       String
+  mimeType               String
+  byteLength             Int
+  sha256                 String                  @db.Char(64)
+  // Device time is untrusted. Server receipt is the authoritative system timestamp.
+  deviceCapturedAt       DateTime?               @db.Timestamptz(3)
+  serverReceivedAt       DateTime                @default(now()) @db.Timestamptz(3)
+  retentionUntil         DateTime                @db.Timestamptz(3)
+  deletedAt              DateTime?               @db.Timestamptz(3)
+  order                  Order                   @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+  captureSession         EvidenceCaptureSession? @relation(fields: [organisationId, orderId, captureSessionId], references: [organisationId, orderId, id], onDelete: Restrict)
+  capturedBy             Membership              @relation(fields: [organisationId, capturedByMembershipId], references: [organisationId, id], onDelete: Restrict)
+  exportEntries          EvidenceExportAsset[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, orderId, id])
+  @@unique([organisationId, orderId, clientCaptureId])
+  @@index([organisationId, orderId, serverReceivedAt])
+  @@index([organisationId, retentionUntil])
+}
+
+model HandoverEvent {
+  id                     String     @id @default(uuid()) @db.Uuid
+  organisationId         String     @db.Uuid
+  orderId                String     @db.Uuid
+  capturedByMembershipId String     @db.Uuid
+  sealId                 String?
+  courierReference       String?
+  deviceOccurredAt       DateTime?  @db.Timestamptz(3)
+  serverReceivedAt       DateTime   @default(now()) @db.Timestamptz(3)
+  note                   String?
+  order                  Order      @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+  capturedBy             Membership @relation(fields: [organisationId, capturedByMembershipId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, orderId, serverReceivedAt])
+}
+
+model DisputeCase {
+  id             String          @id @default(uuid()) @db.Uuid
+  organisationId String          @db.Uuid
+  orderId        String          @db.Uuid
+  providerCaseId String?
+  status         DisputeStatus   @default(DRAFT)
+  reason         String
+  note           String?
+  openedAt       DateTime        @default(now()) @db.Timestamptz(3)
+  resolvedAt     DateTime?       @db.Timestamptz(3)
+  order          Order           @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+  exports        EvidenceExport[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, orderId, id])
+}
+
+model EvidenceExport {
+  id                    String                @id @default(uuid()) @db.Uuid
+  organisationId        String                @db.Uuid
+  orderId               String                @db.Uuid
+  disputeCaseId         String?               @db.Uuid
+  createdByMembershipId String                @db.Uuid
+  storageKey            String                @unique
+  sha256                String                @db.Char(64)
+  manifestSha256        String                @db.Char(64)
+  manifest              Json
+  createdAt             DateTime              @default(now()) @db.Timestamptz(3)
+  retentionUntil        DateTime              @db.Timestamptz(3)
+  order                 Order                 @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+  disputeCase           DisputeCase?          @relation(fields: [organisationId, orderId, disputeCaseId], references: [organisationId, orderId, id], onDelete: Restrict)
+  createdBy             Membership            @relation(fields: [organisationId, createdByMembershipId], references: [organisationId, id], onDelete: Restrict)
+  entries               EvidenceExportAsset[]
+
+  @@unique([organisationId, id])
+  @@unique([organisationId, orderId, id])
+  @@index([organisationId, orderId, createdAt])
+}
+
+model EvidenceExportAsset {
+  id             String         @id @default(uuid()) @db.Uuid
+  organisationId String         @db.Uuid
+  orderId        String         @db.Uuid
+  exportId       String         @db.Uuid
+  evidenceId     String         @db.Uuid
+  export         EvidenceExport @relation(fields: [organisationId, orderId, exportId], references: [organisationId, orderId, id], onDelete: Restrict)
+  evidence       EvidenceAsset  @relation(fields: [organisationId, orderId, evidenceId], references: [organisationId, orderId, id], onDelete: Restrict)
+
+  @@unique([organisationId, exportId, evidenceId])
+}
+
+model WebhookInbox {
+  id                 String             @id @default(uuid()) @db.Uuid
+  organisationId     String             @db.Uuid
+  connectionId       String             @db.Uuid
+  providerEventId    String
+  payloadSha256      String             @db.Char(64)
+  privatePayloadKey  String?
+  signatureVerified  Boolean            @default(false)
+  mode               IntegrationMode    @default(SANDBOX)
+  status             JobStatus          @default(PENDING)
+  providerOccurredAt DateTime?          @db.Timestamptz(3)
+  receivedAt         DateTime           @default(now()) @db.Timestamptz(3)
+  processedAt        DateTime?          @db.Timestamptz(3)
+  attempts           Int                @default(0)
+  failureCode        String?
+  connection         ProviderConnection @relation(fields: [organisationId, connectionId], references: [organisationId, id], onDelete: Restrict)
+
+  @@unique([organisationId, connectionId, providerEventId])
+  @@index([organisationId, status, receivedAt])
+}
+
+model SyncJob {
+  id             String             @id @default(uuid()) @db.Uuid
+  organisationId String             @db.Uuid
+  connectionId   String             @db.Uuid
+  status         JobStatus          @default(PENDING)
+  mode           IntegrationMode    @default(SANDBOX)
+  cursor         String?
+  attempts       Int                @default(0)
+  scheduledAt    DateTime           @default(now()) @db.Timestamptz(3)
+  startedAt      DateTime?          @db.Timestamptz(3)
+  finishedAt     DateTime?          @db.Timestamptz(3)
+  failureCode    String?
+  connection     ProviderConnection @relation(fields: [organisationId, connectionId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, status, scheduledAt])
+}
+
+// Restrict UPDATE/DELETE for the production app role in reviewed migrations.
+model AuditLog {
+  id                String       @id @default(uuid()) @db.Uuid
+  organisationId    String       @db.Uuid
+  actorMembershipId String?      @db.Uuid
+  orderId           String?      @db.Uuid
+  action            String
+  entityType        String
+  entityId          String
+  metadata          Json
+  serverOccurredAt  DateTime    @default(now()) @db.Timestamptz(3)
+  organisation      Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  actor             Membership?  @relation(fields: [organisationId, actorMembershipId], references: [organisationId, id], onDelete: Restrict)
+  order             Order?       @relation(fields: [organisationId, orderId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, serverOccurredAt])
+  @@index([organisationId, orderId, serverOccurredAt])
+}
+
+model Subscription {
+  id                   String       @id @default(uuid()) @db.Uuid
+  organisationId       String       @db.Uuid
+  planCode             String
+  status               String
+  billingReference     String?
+  currentPeriodStart   DateTime?    @db.Timestamptz(3)
+  currentPeriodEnd     DateTime?    @db.Timestamptz(3)
+  createdAt            DateTime     @default(now()) @db.Timestamptz(3)
+  organisation         Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId, status])
+}
+
+model UsageRecord {
+  id             String       @id @default(uuid()) @db.Uuid
+  organisationId String       @db.Uuid
+  metric         String
+  quantity       Int
+  idempotencyKey String
+  occurredAt     DateTime     @default(now()) @db.Timestamptz(3)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+
+  @@unique([organisationId, idempotencyKey])
+  @@index([organisationId, metric, occurredAt])
+}
+
+model ConsentRecord {
+  id                String        @id @default(uuid()) @db.Uuid
+  organisationId    String        @db.Uuid
+  actorMembershipId String?       @db.Uuid
+  purpose           String
+  policyVersion     String
+  action            ConsentAction
+  serverOccurredAt  DateTime      @default(now()) @db.Timestamptz(3)
+  organisation      Organisation  @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  actor             Membership?   @relation(fields: [organisationId, actorMembershipId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, purpose, serverOccurredAt])
+}
+
+model RetentionPolicy {
+  id                 String       @id @default(uuid()) @db.Uuid
+  organisationId     String       @db.Uuid
+  locationId         String?      @db.Uuid
+  evidenceDays       Int          @default(30)
+  exportDays         Int          @default(30)
+  // Leave undecided audit retention unset; it requires a documented business policy.
+  auditDays          Int?
+  version            Int          @default(1)
+  active             Boolean      @default(true)
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  organisation       Organisation @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  location           Location?    @relation(fields: [organisationId, locationId], references: [organisationId, id], onDelete: Restrict)
+
+  @@index([organisationId, locationId, active])
+}

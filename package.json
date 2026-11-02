@@ -1,0 +1,44 @@
+{
+  "name": "rtg-ready-to-go",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "test:e2e": "playwright test",
+    "schema:validate": "prisma validate"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.5.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "1.26.0",
+    "next": "16.4.3",
+    "pdf-lib": "1.17.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.3",
+    "prisma": "^6.19.0",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
