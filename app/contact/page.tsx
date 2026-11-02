@@ -1,0 +1,3 @@
+import Link from "next/link";
+import "../marketing.css";
+export default function Contact(){return <main className="marketing"><article className="m-legal"><Link href="/">← RTG home</Link><p className="m-eyebrow">PILOT PREPARATION</p><h1>Talk to your RTG workspace owner</h1><p>A support address and production operator have not yet been configured. This demo does not send contact forms or collect enquiries.</p><h2>For a production pilot</h2><p>Agree the participating locations, staff access, retention policy, legal review, hosting and service owner. Uber Eats and Deliveroo access must be approved independently through their official partner channels.</p><p><Link href="/console">Open the sandbox workspace →</Link></p></article></main>}

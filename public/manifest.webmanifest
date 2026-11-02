@@ -1,0 +1,7 @@
+{
+  "id": "/capture", "name": "RTG Staff Capture", "short_name": "RTG Capture",
+  "description": "Sandbox order evidence capture with visible offline draft sync.",
+  "start_url": "/capture", "scope": "/", "display": "standalone",
+  "background_color": "#101210", "theme_color": "#101210",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
