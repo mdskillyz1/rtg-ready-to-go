@@ -79,3 +79,7 @@ Only configure variables read by implemented adapters. Naming a database, identi
 Before releasing, verify the complete deployed path with isolated test data: sign in, resolve the authorized location, create an order, upload/read a photo, recheck its digest, generate a PDF and inspect the audit event. Attempt cross-tenant and insufficient-role access. Test concurrent writes, upload/PDF limits, cold starts and retention failures. Confirm all unapproved provider actions still reject. Retain a known-good deployment for rollback.
 
 Obtain explicit production and paid-resource approval before provisioning or releasing. Record external resource IDs and URLs only after successful creation/deployment. No external repository, Vercel project, paid service or live provider connection is created by these instructions.
+
+## Deliberately read-only hosted demo
+
+The user has authorised GitHub publication and a Vercel preview. The Vercel server flag selects a separate static synthetic dataset for `/console`, `/admin` and `/internal`; `/capture` displays a disabled-capture explanation. The client has no hosted sandbox-session bootstrap or data API reads. No credentials, local `.data/` state, original evidence or browser drafts are uploaded. All real provider and hosted API guards remain unchanged. This allows review of the UI without treating Vercel local files as durable storage or representing production setup as complete. Preserve Vercel deployment protection and use the connected authorised account.

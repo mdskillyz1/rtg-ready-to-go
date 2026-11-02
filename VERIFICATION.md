@@ -41,3 +41,9 @@ Some files in the synchronised Documents directory were marked dataless and caus
 - Nothing has been pushed, hosted or deployed. Production deployment and paid resources require explicit approval under the supplied specification.
 
 See the architecture, security, integration and deployment documents for the production dependency and partner approval gates.
+
+## Hosted read-only preview preparation
+
+A follow-up deployment request authorised GitHub upload and Vercel hosting. The hosted build now derives a read-only flag on the server whenever `VERCEL` is present. It displays deterministic synthetic Viewer fixtures without making browser API/session calls or using offline drafts/storage. Uploads, order mutations, exports, role changes and retention changes are disabled. The capture route explains the local-only workflow. Backend hosted access and provider methods remain blocked.
+
+Validation after this change: lint and typecheck passed; 20 Vitest tests passed; all 3 local Playwright flows passed; a `VERCEL=1` production Webpack build passed. Production browser assertions confirmed zero API bootstrap requests, zero runtime errors, working synthetic location switching, disabled mutations/export/settings, the capture explanation, and HTTP 503 from the hosted session API. These are read-only demonstration checks, not production service verification.

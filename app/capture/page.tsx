@@ -1,2 +1,2 @@
 import RtgApp from "@/components/rtg-app";
-export default function CapturePage() { return <RtgApp captureOnly />; }
+export default function CapturePage() { return <RtgApp captureOnly readOnlyPreview={Boolean(process.env.VERCEL)} />; }
