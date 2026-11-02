@@ -61,10 +61,12 @@ Prisma validation does not connect to a database. Tests cover scope/roles, sessi
 
 Read [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DATA_MODEL.md](DATA_MODEL.md), [API_INTEGRATIONS.md](API_INTEGRATIONS.md), [SECURITY.md](SECURITY.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [workers/README.md](workers/README.md).
 
-Provider adapters prohibit live fetch/accept/cancel/fulfil/claim submission. Partner approval, secure credentials, merchant consent and validation are required before approved access. Production deployment and paid resources require explicit user approval. No push or deployment has occurred.
+Provider adapters prohibit live fetch/accept/cancel/fulfil/claim submission. Partner approval, secure credentials, merchant consent and validation are required before approved access. The user has authorised publishing this source to GitHub and the read-only UI to Vercel. A live production backend and paid resources remain separate approval gates.
 
 If a synchronised Documents folder leaves source files marked dataless, extract the source archive into an unsynchronised development directory and run `npm ci` there. The demonstration preview in this Codex session runs from a clean temporary checkout.
 
 ## Hosted read-only preview
+
+Open the [hosted demonstration](https://rtg-ready-to-go.vercel.app/console). Source: [mdskillyz1/rtg-ready-to-go](https://github.com/mdskillyz1/rtg-ready-to-go). The Vercel project is `rtg-ready-to-go` in the authorised `mdskillyz1s-projects` team. Deployment validation is recorded in `VERIFICATION.md`.
 
 On Vercel, the server renders the console from deterministic public synthetic fixtures with a fixed Viewer role. Search, filtering, order details and fixture-location selection work. Hosted pages do not create a sandbox session, call the data APIs, register the capture service worker or store photo drafts. Uploads, status changes, manual orders, imports, exports and settings changes are disabled; `/capture` explains that the complete workflow remains local. All existing API guards still reject hosted data operations. This preview is not a production backend or live provider connection.

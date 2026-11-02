@@ -38,7 +38,7 @@ Some files in the synchronised Documents directory were marked dataless and caus
 - All provider data is explicitly DEMO. Only creation fixtures are implemented; live signature verification, cancellation/out-of-order processing and reconciliation await approved access and implementation.
 - Receipt OCR, authorised CSV import, production billing/UK VAT, support-access approval workflows and complete privacy operations remain later milestones.
 - Schema validation is not database-layer tenant isolation validation. Local tests do not establish production GDPR compliance, performance, accessibility conformance or camera speed targets.
-- Nothing has been pushed, hosted or deployed. Production deployment and paid resources require explicit approval under the supplied specification.
+- The follow-up request authorises GitHub source publication and Vercel hosting of the read-only demonstration. A live production backend and paid resources remain separate approval gates.
 
 See the architecture, security, integration and deployment documents for the production dependency and partner approval gates.
 
@@ -47,3 +47,9 @@ See the architecture, security, integration and deployment documents for the pro
 A follow-up deployment request authorised GitHub upload and Vercel hosting. The hosted build now derives a read-only flag on the server whenever `VERCEL` is present. It displays deterministic synthetic Viewer fixtures without making browser API/session calls or using offline drafts/storage. Uploads, order mutations, exports, role changes and retention changes are disabled. The capture route explains the local-only workflow. Backend hosted access and provider methods remain blocked.
 
 Validation after this change: lint and typecheck passed; 20 Vitest tests passed; all 3 local Playwright flows passed; a `VERCEL=1` production Webpack build passed. Production browser assertions confirmed zero API bootstrap requests, zero runtime errors, working synthetic location switching, disabled mutations/export/settings, the capture explanation, and HTTP 503 from the hosted session API. These are read-only demonstration checks, not production service verification.
+
+## Initial hosted release — 2 November 2026
+
+The full four-commit history through `e92c5bc` was pushed to [GitHub](https://github.com/mdskillyz1/rtg-ready-to-go). Vercel deployment `dpl_2ks2NStMZWALtaYvddCKzekQWixp` reached `READY` from that exact commit and assigned [rtg-ready-to-go.vercel.app](https://rtg-ready-to-go.vercel.app). Vercel classified this first release as its production target; the application remains a read-only demonstration with synthetic data and no production backend.
+
+The deployed console was opened in the browser and displayed the hosted demo banner, synthetic orders and disabled order creation. The first GitHub Actions run executed no jobs because `runner.temp` is unavailable in job-level `env`. The correction configures the same isolated data directory through `$RUNNER_TEMP` and `$GITHUB_ENV` in an initial shell step; YAML parsing and whitespace validation passed. Subsequent remote check results are available in GitHub Actions.

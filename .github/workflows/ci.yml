@@ -20,12 +20,13 @@ jobs:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       RTG_MODE: sandbox
-      RTG_DATA_DIR: ${{ runner.temp }}/rtg-sandbox
       RTG_SESSION_SECRET: rtg-ci-fictional-data-only-session-secret
       RTG_SANDBOX_WEBHOOK_SECRET: rtg-ci-fixture-webhook-secret
       # Schema validation does not connect to this placeholder database.
       DATABASE_URL: postgresql://rtg:rtg@127.0.0.1:5432/rtg_design
     steps:
+      - name: Configure sandbox data directory
+        run: echo "RTG_DATA_DIR=$RUNNER_TEMP/rtg-sandbox" >> "$GITHUB_ENV"
       - name: Check out source
         uses: actions/checkout@v6
         with:
